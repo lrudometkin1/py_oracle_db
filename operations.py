@@ -5,12 +5,10 @@ import getpass
 import oracledb
 import pandas
 
-def extract_pnr_data(start_date, end_date):
+def extract_test_data(start_date, end_date):
     '''
-    Runs a query to extract pnr information from AIX between specific dates
-    :param start_date: string representing the starting date in the format YYYY-MM-DD. example: 2023-04-18
-    :param end_date: string representing the end date in the format YYYY-MM-DD. example: 2023-04-19
-    :return: The absolute path of the file containing the extracted data
+    oracle database example
+
     '''
 
     user = getpass.getpass(prompt='User: ')
@@ -24,8 +22,8 @@ def extract_pnr_data(start_date, end_date):
     connection = oracledb.connect(
         user=user,
         password=pwd,
-        service_name='haprod',
-        host='10.112.217.237')
+        service_name='',
+        host='')
 
     print("Successfully connected to Oracle Database")
 
@@ -33,49 +31,49 @@ def extract_pnr_data(start_date, end_date):
 
     query = f"""
         select distinct
-            b.rloc,
+            b.test,
             bn.raw_name,
-            TO_CHAR(bni.departure_date_time, 'YYYY-MM-DD HH24:MI:SS'),
-            bni.operating_flight_num,
-            bni.origin,
-            bni.destination
-        from booking b
-        join booking_name bn on b.booking_id = bn.booking_id
-        left join booking_name_item bni on bn.booking_name_id = bni.booking_name_id
-        where bni.departure_date_time at time zone 'Pacific/Honolulu' between timestamp'{start_date}' and timestamp'{end_date}'
-            and bni.operating_carrier = 'HA'
+            TO_CHAR(bni.test_date_time, 'YYYY-MM-DD HH24:MI:SS'),
+            bni.operating_test_num,
+            bni.test,
+            bni.test
+        from test b
+        join test_name bn on b.test_id = bn.test_id
+        left join test_name_item bni on bn.test_name_id = bni.test_name_id
+        where bni.test_date_time at time zone 'Pacific/Honolulu' between timestamp'{start_date}' and timestamp'{end_date}'
+            and bni.test = 'Test'
             and Bni.item_status in ( 1,2,3,4 )
-        order by TO_CHAR(bni.departure_date_time, 'YYYY-MM-DD HH24:MI:SS') asc
+        order by TO_CHAR(bni.date_time, 'YYYY-MM-DD HH24:MI:SS') asc
     """
 
     cursor = connection.cursor()
-    cursor.execute("ALTER SESSION SET CURRENT_SCHEMA = HA_CUR_OWNR")
+    cursor.execute("ALTER SESSION SET CURRENT_SCHEMA = name")
     cursor.execute(query)
     page_size = 10
     rows = cursor.fetchmany(page_size)
 
-    output_file_name = os.path.join(output_directory, 'pnr_info.csv')
+    output_file_name = os.path.join(output_directory, 'test_info.csv')
 
     data_file = open(output_file_name, 'w', newline='')
 
     csv_writer = csv.writer(data_file)
-    header = ['PNR', 'Last Name', 'First Name', 'Flight Date', 'Flight#', 'Orig', 'Dest']
+    header = ['test', 'Last Name', 'First Name', 'test Date', 'test#', 'Orig', 'Dest']
     csv_writer.writerow(header)
     print("Extracting data...")
     while rows:
         for row in rows:
-            pnr = row[0]
+            test = row[0]
             last_name = row[1].split('/')[0]
             if '## NONAME ##' in last_name:
                 continue
             first_name = row[1].split('/')[1]
-            flight_date = row[2]
-            flight_number = row[3]
-            origin = row[4]
-            if 'GRP' in origin:
+            test_date = row[2]
+            test_number = row[3]
+            test = row[4]
+            if 'GRP' in test:
                 continue
-            destination = row[5]
-            entry = [pnr, last_name, first_name, flight_date, flight_number, origin, destination]
+            test = row[5]
+            entry = [test, last_name, first_name, test_date, test_number, test, test]
             csv_writer.writerow(entry)
         rows = cursor.fetchmany(page_size)
     cursor.close()
@@ -83,7 +81,7 @@ def extract_pnr_data(start_date, end_date):
     print(f'Database connection closed')
     print(f'Extracting data completed, please check file {output_file_name}')
     csv_df = pandas.read_csv(output_file_name)
-    output_file_xls = os.path.join(output_directory, 'pnr_info_all.xlsx')
+    output_file_xls = os.path.join(output_directory, 'test_info_all.xlsx')
     csv_df.to_excel(output_file_xls, sheet_name='All', index=False)
 
     return output_file_name
